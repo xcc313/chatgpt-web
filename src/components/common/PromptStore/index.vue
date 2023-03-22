@@ -210,12 +210,28 @@ const exportPromptTemplate = () => {
 // 模板在线导入
 const downloadPromptTemplate = async () => {
   try {
+    let jsonData, csvData
     importLoading.value = true
     const response = await fetch(downloadURL.value)
-    const jsonData = await response.json()
-    if ('key' in jsonData[0] && 'value' in jsonData[0])
+    if (downloadURL.value.endsWith('json'))
+      jsonData = await response.json()
+    else
+      csvData = await response.text()
+
+    if (csvData) {
+      jsonData = csvData.split(/\r\n|\n/).map((line) => {
+        const kv = line.split(',')
+        return {
+          key: kv[0],
+          value: kv[1],
+        }
+      })
       tempPromptValue.value = JSON.stringify(jsonData)
-    if ('act' in jsonData[0] && 'prompt' in jsonData[0]) {
+    }
+
+    if (jsonData && 'key' in jsonData[0] && 'value' in jsonData[0])
+      tempPromptValue.value = JSON.stringify(jsonData)
+    if (jsonData && 'act' in jsonData[0] && 'prompt' in jsonData[0]) {
       const newJsonData = jsonData.map((item: { act: string; prompt: string }) => {
         return {
           key: item.act,
