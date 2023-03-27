@@ -3,13 +3,15 @@ import 'isomorphic-fetch'
 import type { ChatGPTAPIOptions, ChatMessage, SendMessageOptions } from 'chatgpt'
 import { ChatGPTAPI, ChatGPTUnofficialProxyAPI } from 'chatgpt'
 import { SocksProxyAgent } from 'socks-proxy-agent'
-import { HttpsProxyAgent } from 'https-proxy-agent'
+import httpsProxyAgent from 'https-proxy-agent'
 import fetch from 'node-fetch'
 import axios from 'axios'
 import { sendResponse } from '../utils'
 import { isNotEmptyString } from '../utils/is'
 import type { ApiModel, ChatContext, ChatGPTUnofficialProxyAPIOptions, ModelConfig } from '../types'
 import type { RequestOptions } from './types'
+
+const { HttpsProxyAgent } = httpsProxyAgent
 
 dotenv.config()
 
@@ -35,6 +37,7 @@ let api: ChatGPTAPI | ChatGPTUnofficialProxyAPI
   // More Info: https://github.com/transitive-bullshit/chatgpt-api
 
   if (isNotEmptyString(process.env.OPENAI_API_KEY)) {
+    const OPENAI_API_BASE_URL = process.env.OPENAI_API_BASE_URL
     const OPENAI_API_MODEL = process.env.OPENAI_API_MODEL
     const model = isNotEmptyString(OPENAI_API_MODEL) ? OPENAI_API_MODEL : 'gpt-3.5-turbo'
 
@@ -44,8 +47,21 @@ let api: ChatGPTAPI | ChatGPTUnofficialProxyAPI
       debug: true,
     }
 
-    if (isNotEmptyString(process.env.OPENAI_API_BASE_URL))
-      options.apiBaseUrl = process.env.OPENAI_API_BASE_URL
+    // increase max token limit if use gpt-4
+    if (model.toLowerCase().includes('gpt-4')) {
+      // if use 32k model
+      if (model.toLowerCase().includes('32k')) {
+        options.maxModelTokens = 32768
+        options.maxResponseTokens = 8192
+      }
+      else {
+        options.maxModelTokens = 8192
+        options.maxResponseTokens = 2048
+      }
+    }
+
+    if (isNotEmptyString(OPENAI_API_BASE_URL))
+      options.apiBaseUrl = `${OPENAI_API_BASE_URL}/v1`
 
     setupProxy(options)
 
@@ -53,10 +69,13 @@ let api: ChatGPTAPI | ChatGPTUnofficialProxyAPI
     apiModel = 'ChatGPTAPI'
   }
   else {
+    const OPENAI_API_MODEL = process.env.OPENAI_API_MODEL
     const options: ChatGPTUnofficialProxyAPIOptions = {
       accessToken: process.env.OPENAI_ACCESS_TOKEN,
       debug: true,
     }
+    if (isNotEmptyString(OPENAI_API_MODEL))
+      options.model = OPENAI_API_MODEL
 
     if (isNotEmptyString(process.env.API_REVERSE_PROXY))
       options.apiReverseProxyUrl = process.env.API_REVERSE_PROXY
